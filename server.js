@@ -24,7 +24,7 @@ app.get('/compile', function(req, res) {
     var user = req.params('user');
     var dir = path.join(__dirname, '/output/' + user);
     var inDir = path.join(__dirname, '/uploads/' + user);
-    var beat = path.join(__dirname, '/audio/upbeat.mps');
+    var beat = path.join(__dirname, '/audio/upbeat.mp3');
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir);
     }
