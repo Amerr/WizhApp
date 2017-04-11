@@ -62,20 +62,25 @@ app.get('/render', function(req, res) {
         fileFullPath(inDir, list).forEach(function(videoName){
             command = command.addInput(videoName);
         });
-        command.mergeToFile(dir + '/fluent_output.mp4')
+        command.mergeToFile(dir + '/tmp_output.mp4', './tmp/')
         .on('error', function(err) {
             console.log('Error ' + err.message);
-            res.status(500);
-            res.json({
-                'success': false
-            });
         })
         .on('end', function() {
             console.log('Finished!');
-            res.status(200);
-            res.json({
-                'success': true
-            });
+            var status = addText(dir , user);
+            if (status=="success"){
+                res.status(200);
+                res.json({
+                    'success': true
+                });
+            } else{
+                res.status(500);
+                res.json({
+                    'success': false
+                });
+            }
+
         });
     });
 });
@@ -107,6 +112,38 @@ function concatOperator(list, input) {
 
 function conctatOutput(input, dir) {
     return input + ' -strict -2 -y ' + dir + '/cmd_output.mp4'
+}
+
+function addText(filePath, user){
+    var beat = path.join(__dirname, '/audio/upbeat.mp3'),
+        font = path.join(__dirname, '/font/Roboto-Medium.ttf');
+    ffmpeg(filePath+ '/tmp_output.mp4')
+    .complexFilter([
+      {
+        filter: 'drawtext',
+        options: {
+          fontfile: font,
+          text: 'Happy Birthday '+ user,
+          fontsize: 40,
+          fontcolor: 'white',
+          x: '(w-text_w)/2',
+          y: '((h-text_h)/2 + 300 )',
+          shadowcolor: 'black',
+          shadowx: 2,
+          shadowy: 2
+        },
+        outputs: 'output'
+      }
+    ], 'output')
+    .saveToFile(filePath + '/output.mp4')
+    .on('error', function(err) {
+        console.log('Error ' + err.message);
+        return "error";
+    })
+    .on('end', function() {
+        console.log('Finished!');
+        return "success";
+    });
 }
 
 app.post('/upload', function(req, res) {
