@@ -9,7 +9,9 @@
     "express-fileupload": "^0.1.2",
     "fluent-ffmpeg": "^2.1.0",
     "formidable": "^1.1.1",
-    "gm": "^1.23.0"
+    "fs-extra": "^2.1.2",
+    "gm": "^1.23.0",
+    "range-function": "^0.1.1"
   },
   "devDependencies": {
     "promise": "^7.1.1"

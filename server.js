@@ -5,12 +5,14 @@
 var express = require('express');
 var http = require('http');
 var formidable = require('formidable');
-var fs = require('fs');
+// var fs = require('fs');
+var fs = require("fs-extra");
 var path = require('path');
 var bodyParser = require('body-parser');
 var exec = require('child_process').exec;
 var ffmpeg = require('fluent-ffmpeg');
 var fileUpload = require('express-fileupload');
+var range = require("range-function");
 
 var app = express();
 
@@ -157,24 +159,70 @@ function addText(filePath, user){
 }
 
 app.post('/upload', function(req, res) {
-    if(!req.files) {
-      return res.status(400).send({ msg: 'No files were uploaded' });
-    }
-    var file = req.files.file;
-
-    var dir = path.join(process.env.PWD, '/uploads/', req.body.user);
-
-    if (!fs.existsSync(dir)){
-      fs.mkdirSync(dir);
-    }
-
-    var fileName = Date.now() + file.name;
-
+  if(!req.files) {
+    return res.status(400).send({ msg: 'No files were uploaded' });
+  }
+  var wid = req.body.wid,
+      uid = req.body.uid,
+      text = req.body.text,
+      dp = req.files.dp_image,
+      dir = path.join(process.env.PWD, '/uploads/', wid, '/rawinputs/', uid),
+      imageExt = dp.name.split('.').pop(),
+      dpName = uid + '_dp.' + imageExt;
+  if (!fs.existsSync(dir)){
+    fs.ensureDirSync(dir);
+  }
+  if (req.body.r_type == "video"){
+    var file = req.files.v_file,
+        fileExt = file.name.split('.').pop(),
+        fileName = uid + '.' + fileExt;
     file.mv(dir + '/' + fileName, function(err) {
-      if (!err) {
-        return res.send({msg: 'File uploaded successfully'});
-      } else {
-        return res.status(500).send({ msg: 'Error occurend during file upload', err: err });
+      if (err) {
+        return res.status(500).send({ msg: 'Error occurend during video file upload', err: err });
       }
     });
+  }
+  if (req.body.r_type == "image"){
+    var file = req.files.i_file,
+        fileExt = file.name.split('.').pop(),
+        fileName = uid + '.' + fileExt;
+    file.mv(dir + '/' + fileName, function(err) {
+      if (err) {
+        return res.status(500).send({ msg: 'Error occurend during image file upload', err: err });
+      }
+    });
+  }
+  if (req.body.r_type == "audio"){
+    var imageCount = req.body.no,
+        file = req.files.a_file,
+        fileExt = file.name.split('.').pop(),
+        fileName = uid + '.' + fileExt,
+        imageExt = dp.name.split('.').pop();
+    if (!fs.existsSync(dir)){
+      fs.ensureDirSync(dir);
+    }
+    file.mv(dir + '/' + fileName, function(err) {
+      if (err) {
+        return res.status(500).send({ msg: 'Error occurend during image file upload', err: err });
+      }
+    });
+    range(1,imageCount,'inclusive').forEach(function(count){
+      var imageFile = req.files["image_"+count],
+          ext = imageFile.name.split('.').pop(),
+          name = uid + '_image_' + count + '.' + imageExt;
+
+      imageFile.mv(dir + '/' + name, function(err) {
+        if (err) {
+          return res.status(500).send({ msg: 'Error occurend during image file upload', err: err });
+        }
+      });
+    });
+  }
+  dp.mv(dir + '/' + dpName, function(err) {
+    if (!err) {
+      return res.send({msg: 'Files uploaded successfully'});
+    } else {
+      return res.status(500).send({ msg: 'Error occurend during DP image upload', err: err });
+    }
+  });
 });
