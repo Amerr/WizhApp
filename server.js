@@ -2,16 +2,26 @@
  * NodeJS code.
  */
 // Required modules.
-var express = require('express'),
-    http = require('http'),
-    formidable = require('formidable'),
-    fs = require('fs'),
-    path = require('path'),
-    exec = require('child_process').exec,
-    ffmpeg = require('fluent-ffmpeg');
+var express = require('express');
+var http = require('http');
+var formidable = require('formidable');
+var fs = require('fs');
+var path = require('path');
+var bodyParser = require('body-parser');
+var exec = require('child_process').exec;
+var ffmpeg = require('fluent-ffmpeg');
+var fileUpload = require('express-fileupload');
 
-var app = express(),
-    uploadPath = path.join(__dirname, '/uploads');
+var app = express();
+
+app.use(fileUpload());
+app.use(bodyParser.urlencoded({
+  extended: true
+}));
+app.use(bodyParser.json());
+
+
+var uploadPath = path.join(__dirname, '/uploads');
 
 var server = app.listen(8000, function() {
     console.log('Server listening on port 8000');
@@ -147,37 +157,24 @@ function addText(filePath, user){
 }
 
 app.post('/upload', function(req, res) {
-    var form = new formidable.IncomingForm();
-    form.parse(req, function(err, fields, files) {
-        // `file` is the name of the <input> field of type `file`
-        var user = fields.user,
-            userPath = uploadPath + '/' + user;
-        if (!fs.existsSync(userPath)) {
-            fs.mkdirSync(userPath);
-        };
-        var old_path = files.file.path,
-            file_size = files.file.size,
-            file_ext = files.file.name.split('.').pop(),
-            index = old_path.lastIndexOf('/') + 1,
-            file_name = old_path.substr(index),
-            new_path = path.join(process.env.PWD, '/uploads/', user, file_name + '.' + file_ext);
+    if(!req.files) {
+      return res.status(400).send({ msg: 'No files were uploaded' });
+    }
+    var file = req.files.file;
 
-        fs.readFile(old_path, function(err, data) {
-            fs.writeFile(new_path, data, function(err) {
-                fs.unlink(old_path, function(err) {
-                    if (err) {
-                        res.status(500);
-                        res.json({
-                            'success': false
-                        });
-                    } else {
-                        res.status(200);
-                        res.json({
-                            'success': true
-                        });
-                    }
-                });
-            });
-        });
+    var dir = path.join(process.env.PWD, '/uploads/', req.body.user);
+
+    if (!fs.existsSync(dir)){
+      fs.mkdirSync(dir);
+    }
+
+    var fileName = Date.now() + file.name;
+
+    file.mv(dir + '/' + fileName, function(err) {
+      if (!err) {
+        return res.send({msg: 'File uploaded successfully'});
+      } else {
+        return res.status(500).send({ msg: 'Error occurend during file upload', err: err });
+      }
     });
 });
