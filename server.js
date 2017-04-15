@@ -13,6 +13,7 @@ var exec = require('child_process').exec;
 var ffmpeg = require('fluent-ffmpeg');
 var fileUpload = require('express-fileupload');
 var range = require("range-function");
+var ImageGraphics = require('./gm-node');
 
 var app = express();
 
@@ -226,3 +227,7 @@ app.post('/upload', function(req, res) {
     }
   });
 });
+
+function sample() {
+  ImageGraphics.generateGradient();
+}

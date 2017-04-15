@@ -171,10 +171,19 @@ function main(profileImg, textMsg) {
 
   });
 }
+// 
+// main('user1.jpg', 'Nallai allai')
+// .then(function(userTemplate) {
+//   return overlayImageWithProfile(userTemplate, 'Image.png').then(function(masterOutput) {
+//     console.log("Master output", masterOutput);
+//   });
+// });
 
-main('user1.jpg', 'Nallai allai')
-.then(function(userTemplate) {
-  return overlayImageWithProfile(userTemplate, 'Image.png').then(function(masterOutput) {
-    console.log("Master output", masterOutput);
-  });
-});
+module.exports = {
+  generateGradient: generateGradient,
+  createMaskImage: createMaskImage,
+  maskProfileToRounded: maskProfileToRounded,
+  overlayGradientWithProfile: overlayGradientWithProfile,
+  addTextToGradientTemplate: addTextToGradientTemplate,
+  overlayImageWithProfile: overlayImageWithProfile
+};
