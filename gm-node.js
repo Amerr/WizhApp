@@ -185,5 +185,6 @@ module.exports = {
   maskProfileToRounded: maskProfileToRounded,
   overlayGradientWithProfile: overlayGradientWithProfile,
   addTextToGradientTemplate: addTextToGradientTemplate,
-  overlayImageWithProfile: overlayImageWithProfile
+  overlayImageWithProfile: overlayImageWithProfile,
+  main: main
 };

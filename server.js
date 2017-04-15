@@ -63,25 +63,30 @@ app.get('/compile', function(req, res) {
 });
 
 app.get('/render', function(req, res) {
-    var user = req.query.user,
-        dir = path.join(__dirname, '/output/' + user),
-        inDir = path.join(__dirname, '/uploads/' + user),
+    var wid = req.query.wid,
+        inDir = path.join(__dirname, '/uploads/' + wid + '/formated'),
+        tmpDir = path.join(__dirname, '/uploads/' + wid + '/tmp'),
         beat = path.join(__dirname, '/audio/upbeat.mp3'),
         command = ffmpeg();
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir);
-    }
+      if (!fs.existsSync(tmpDir)) {
+        fs.ensureDirSync(tmpDir);
+      }
     fs.readdir(inDir, function(err, list) {
         fileFullPath(inDir, list).forEach(function(videoName){
-            command = command.addInput(videoName);
+          command = command.addInput(videoName);
+          console.log(videoName);
         });
-        command.mergeToFile(dir + '/tmp_output.mp4', './tmp/')
+        command.mergeToFile(tmpDir + '/output.mp4', './tmp/')
         .on('error', function(err) {
             console.log('Error ' + err.message);
+            res.status(500);
+            res.json({
+                'success': false
+            });
         })
         .on('end', function() {
             console.log('Finished!');
-            var status = addText(dir , user);
+            var status = renderVideo(tmpDir , wid);
             if (status=="success"){
                 res.status(200);
                 res.json({
@@ -127,36 +132,39 @@ function conctatOutput(input, dir) {
     return input + ' -strict -2 -y ' + dir + '/cmd_output.mp4'
 }
 
-function addText(filePath, user){
+function renderVideo(filePath, wid){
     var beat = path.join(__dirname, '/audio/upbeat.mp3'),
-        font = path.join(__dirname, '/font/Roboto-Medium.ttf');
-    ffmpeg(filePath+ '/tmp_output.mp4')
-    .complexFilter([
-      {
-        filter: 'drawtext',
-        options: {
-          fontfile: font,
-          text: 'Happy Birthday '+ user,
-          fontsize: 40,
-          fontcolor: 'white',
-          x: '(w-text_w)/2',
-          y: '((h-text_h)/2 + 300 )',
-          shadowcolor: 'black',
-          shadowx: 2,
-          shadowy: 2
-        },
-        outputs: 'output'
+        outDir = path.join(__dirname, '/output/' + wid);
+    if (!fs.existsSync(outDir)) {
+        fs.ensureDirSync(outDir);
       }
-    ], 'output')
-    .saveToFile(filePath + '/output.mp4')
-    .on('error', function(err) {
-        console.log('Error ' + err.message);
-        return "error";
-    })
-    .on('end', function() {
-        console.log('Finished!');
-        return "success";
-    });
+    ffmpeg(filePath+ '/output.mp4')
+      .addInput(beat)
+      .complexFilter([
+        {
+          filter: 'amerge',
+          options: [2],
+          inputs:['0:a', '1:a,volume=0.1'],
+          outputs: 'audio'
+        }
+      ])
+      .outputOptions([
+        '-map 0:v',
+        '-c:v libx264',
+        '-map [audio]',
+        '-c:a mp3',
+        '-b:a 128K'
+      ])
+      .output(outDir + '/output.mp4')
+      .on('error', function(err) {
+          console.log('Error ' + err.message);
+          return "error";
+      })
+      .on('end', function() {
+          console.log('Finished!');
+          return "success";
+      })
+      .run();
 }
 
 app.post('/upload', function(req, res) {
@@ -182,6 +190,7 @@ app.post('/upload', function(req, res) {
         return res.status(500).send({ msg: 'Error occurend during video file upload', err: err });
       }
     });
+    videoWatermark(uid, wid, fileName);
   }
   if (req.body.r_type == "image"){
     var file = req.files.i_file,
@@ -192,13 +201,15 @@ app.post('/upload', function(req, res) {
         return res.status(500).send({ msg: 'Error occurend during image file upload', err: err });
       }
     });
+    imageToVideo(uid, wid, fileName);
   }
   if (req.body.r_type == "audio"){
-    var imageCount = req.body.no,
-        file = req.files.a_file,
+    var file = req.files.a_file,
         fileExt = file.name.split('.').pop(),
         fileName = uid + '.' + fileExt,
-        imageExt = dp.name.split('.').pop();
+        image = req.files.i_file,
+        imageExt = image.name.split('.').pop(),
+        imageName = uid + '_image'+ '.' + imageExt;
     if (!fs.existsSync(dir)){
       fs.ensureDirSync(dir);
     }
@@ -207,17 +218,24 @@ app.post('/upload', function(req, res) {
         return res.status(500).send({ msg: 'Error occurend during image file upload', err: err });
       }
     });
-    range(1,imageCount,'inclusive').forEach(function(count){
-      var imageFile = req.files["image_"+count],
-          ext = imageFile.name.split('.').pop(),
-          name = uid + '_image_' + count + '.' + imageExt;
-
-      imageFile.mv(dir + '/' + name, function(err) {
-        if (err) {
-          return res.status(500).send({ msg: 'Error occurend during image file upload', err: err });
-        }
-      });
+    image.mv(dir + '/' + imageName, function(err) {
+      if (err) {
+        return res.status(500).send({ msg: 'Error occurend during image file upload', err: err });
+      }
     });
+    // images = [];
+    // range(1,imageCount,'inclusive').forEach(function(count){
+    //   var imageFile = req.files["image_"+count],
+    //       ext = imageFile.name.split('.').pop(),
+    //       name = uid + '_image_' + count + '.' + imageExt;
+    //   images.push(name);
+    //   imageFile.mv(dir + '/' + name, function(err) {
+    //     if (err) {
+    //       return res.status(500).send({ msg: 'Error occurend during image file upload', err: err });
+    //     }
+    //   });
+    // });
+    audioToVideo(uid, wid, imageName, fileName);
   }
   dp.mv(dir + '/' + dpName, function(err) {
     if (!err) {
@@ -226,8 +244,104 @@ app.post('/upload', function(req, res) {
       return res.status(500).send({ msg: 'Error occurend during DP image upload', err: err });
     }
   });
+  // sample(dir + '/' + dpName, text);
 });
 
-function sample() {
-  ImageGraphics.generateGradient();
+function sample(image, text) {
+  ImageGraphics.main(image, text).then(function(){
+    console.log("generated")
+  }).catch(function(err){
+    console.log(err);
+  });
+}
+
+
+function imageToVideo(uid,wid,image){
+  var inDir = path.join(process.env.PWD, '/uploads/', wid, '/rawinputs/', uid),
+      outDir = path.join(process.env.PWD, '/uploads/', wid, '/formated');
+  if (!fs.existsSync(outDir)){
+      fs.ensureDirSync(outDir);
+    }
+  ffmpeg(inDir + '/' + image)
+    .loop(5)
+    .withSize('800x1200')
+    .videoCodec('libx264')
+    .input('anullsrc=r=48000:cl=mono')
+    .inputFormat('lavfi')
+    .audioCodec('libmp3lame')
+    .format('mp4')
+    .output(outDir + '/'+ uid +'.mp4')
+    .on('error', function(err) {
+        console.log('Error ' + err.message);
+        return "error";
+    })
+    .on('end', function() {
+      console.log('Finished!');
+      return "success";
+    })
+    .run();
+}
+
+
+function videoWatermark(uid,wid,video){
+  var inDir = path.join(process.env.PWD, '/uploads/', wid, '/rawinputs/', uid),
+      outDir = path.join(process.env.PWD, '/uploads/', wid, '/formated'),
+      intrFile = inDir + 'intr.mp4'
+      wmimage = inDir + '/code_text_gradient_template.png';
+  if (!fs.existsSync(outDir)){
+      fs.ensureDirSync(outDir);
+    }
+  ffmpeg(inDir + '/' + video)
+    .size('800x1200')
+    .videoCodec('libx264')
+    .saveToFile(intrFile)
+    .on('error', function(err) {
+      console.log('Error ' + err.message);
+      return "error";
+    })
+    .on('end', function() {
+      console.log('Finished!');
+      ffmpeg(intrFile)
+        .videoCodec('libx264')
+        .videoFilter(["movie="+ wmimage +" [watermark]; [in][watermark] overlay=main_w-overlay_w-1:main_h-overlay_h+2 [out]"])
+        .output(outDir + '/'+ uid +'.mp4')
+        .on('error', function(err) {
+          console.log('Error ' + err.message);
+          return "error";
+        })
+        .on('end', function() {
+          console.log('Finished!');
+          return "success";
+        })
+        .run();
+      return "success";
+    })
+}
+
+
+function audioToVideo(uid, wid, image, audio){
+  var command = ffmpeg(),
+      inDir = path.join(process.env.PWD, '/uploads/', wid, '/rawinputs/', uid),
+      outDir = path.join(process.env.PWD, '/uploads/', wid, '/formated');
+  ffmpeg(inDir + '/' + audio)
+  .ffprobe(0, function(err, data) {
+    ffmpeg(inDir + '/' + image)
+    .loop(data.format.duration)
+    .input(inDir + '/' + audio)
+    .outputOptions([
+      '-c:v libx264',
+      '-c:a mp3',
+      '-b:a 192k',
+      '-s 800x1200'
+    ])
+    .saveToFile(outDir + '/'+ uid +'.mp4')
+    .on('error', function(err) {
+      console.log('Error ' + err.message);
+      return "error";
+    })
+    .on('end', function() {
+      console.log('Finished!');
+      return "success";
+    });
+  });
 }
