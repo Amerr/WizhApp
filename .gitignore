@@ -2,4 +2,7 @@ node_modules
 output/*
 uploads/*
 !output/.gitkeep
-!uploads/.gitkeep 
+!uploads/.gitkeep
+workstation/*
+**/**.DS_Store
+.DS_Store
