@@ -115,14 +115,29 @@ var vProccesor = {
     ]);
   },
 
+  overlayImageOverVideo(overlay, target) {
+    return ffmpeg(target)
+      .input(overlay)
+      .complexFilter([
+        '[0][1]overlay',
+      ]);
+  },
+
 
 };
+
 
  module.exports = vProccesor;
 
 /**
  * Sample code
  * @type {[type]}
+ *
+ vProccesor.overlayImageOverVideo('./workstation/processed/dp_template.png', './workstation/processed/io2.mp4')
+   .save('./workstation/processed/overlayed.mp4').on('error', function(err, stdout, stderr) {
+         console.log(`Cannot process: ${stderr} ${err.message} `);
+       });
+       return;
 
 
 vProccesor.processImageToVideo('./workstation/io.jpg').save('./workstation/processed/image.mp4')

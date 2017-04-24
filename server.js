@@ -14,6 +14,7 @@ var ffmpeg = require('fluent-ffmpeg');
 var fileUpload = require('express-fileupload');
 var range = require("range-function");
 var ImageGraphics = require('./gm-node');
+var vProccesor = require('./video-process');
 
 var app = express();
 
@@ -171,27 +172,49 @@ app.post('/upload', function(req, res) {
   if(!req.files) {
     return res.status(400).send({ msg: 'No files were uploaded' });
   }
-  var wid = req.body.wid,
-      uid = req.body.uid,
-      text = req.body.text,
-      dp = req.files.dp_image,
-      dir = path.join(process.env.PWD, '/uploads/', wid, '/rawinputs/', uid),
-      imageExt = dp.name.split('.').pop(),
-      dpName = uid + '_dp.' + imageExt;
+  var wid = req.body.wid;
+  var uid = req.body.uid;
+  var text = req.body.text;
+  var dp = req.files.dp_image;
+  var sourceType = req.body.sourceType;
+  var dir = path.join(process.env.PWD, '/uploads/', wid, '/rawinputs/', uid);
+  var imageExt = dp.name.split('.').pop();
+  var dpName = uid + '_dp.' + imageExt;
+
+  // Create Directory
   if (!fs.existsSync(dir)){
     fs.ensureDirSync(dir);
   }
-  if (req.body.r_type == "video"){
-    var file = req.files.v_file,
-        fileExt = file.name.split('.').pop(),
-        fileName = uid + '.' + fileExt;
-    file.mv(dir + '/' + fileName, function(err) {
+
+  if (sourceType === "video") {
+    var file = req.files.source;
+    var fileExt = file.name.split('.').pop();
+    var fileName = uid + '.' + fileExt;
+
+    return file.mv(`${dir}/${fileName}`, function(err) {
+
       if (err) {
-        return res.status(500).send({ msg: 'Error occurend during video file upload', err: err });
+        return res.status(500).send({ msg: 'Error occured  during video file upload', err: err });
       }
+
+      dp.mv(`${dir}/${dpName}`, (err) => {
+        if (err) {
+          return res.status(500).send({ msg: 'Error occured during dp file upload', err: err });
+        }
+
+        return videoWatermark(uid, wid, fileName, dpName, text).then(() => {
+          res.send({message: 'success'});
+        }).catch((reason) => {
+          console.log(reason);
+          res.status(500).send({message: reason});
+        });
+
+      });
     });
-    videoWatermark(uid, wid, fileName);
+
   }
+
+
   if (req.body.r_type == "image"){
     var file = req.files.i_file,
         fileExt = file.name.split('.').pop(),
@@ -247,15 +270,6 @@ app.post('/upload', function(req, res) {
   // sample(dir + '/' + dpName, text);
 });
 
-function sample(image, text) {
-  ImageGraphics.main(image, text).then(function(){
-    console.log("generated")
-  }).catch(function(err){
-    console.log(err);
-  });
-}
-
-
 function imageToVideo(uid,wid,image){
   var inDir = path.join(process.env.PWD, '/uploads/', wid, '/rawinputs/', uid),
       outDir = path.join(process.env.PWD, '/uploads/', wid, '/formated');
@@ -283,39 +297,62 @@ function imageToVideo(uid,wid,image){
 }
 
 
-function videoWatermark(uid,wid,video){
-  var inDir = path.join(process.env.PWD, '/uploads/', wid, '/rawinputs/', uid),
-      outDir = path.join(process.env.PWD, '/uploads/', wid, '/formated'),
-      intrFile = inDir + 'intr.mp4'
-      wmimage = inDir + '/code_text_gradient_template.png';
-  if (!fs.existsSync(outDir)){
-      fs.ensureDirSync(outDir);
-    }
-  ffmpeg(inDir + '/' + video)
-    .size('800x1200')
-    .videoCodec('libx264')
-    .saveToFile(intrFile)
-    .on('error', function(err) {
-      console.log('Error ' + err.message);
-      return "error";
-    })
-    .on('end', function() {
-      console.log('Finished!');
-      ffmpeg(intrFile)
-        .videoCodec('libx264')
-        .videoFilter(["movie="+ wmimage +" [watermark]; [in][watermark] overlay=main_w-overlay_w-1:main_h-overlay_h+2 [out]"])
-        .output(outDir + '/'+ uid +'.mp4')
-        .on('error', function(err) {
-          console.log('Error ' + err.message);
-          return "error";
-        })
-        .on('end', function() {
-          console.log('Finished!');
-          return "success";
-        })
-        .run();
-      return "success";
-    })
+function videoWatermark(uid, wid, video, dpName, textMsg){
+
+
+
+  var inDir = path.join(process.env.PWD, '/uploads/', wid, '/rawinputs/', uid);
+  var outDir = path.join(process.env.PWD, '/uploads/', wid, '/formated');
+  var intrFile = `${inDir}/intr.mp4`;
+  var wmimage = `${inDir}/code_text_gradient_template.png`;
+  let dpPath = path.join(inDir, dpName);
+  let videoPath = path.join(inDir, video);
+  let formatedVideoPath = path.join(outDir, video);
+  let overlayedVideoPath = path.join(outDir, 'overlayed.mp4');
+
+  if (!fs.existsSync(outDir)) {
+    fs.ensureDirSync(outDir);
+  }
+
+  return ImageGraphics.makeDpTemplate(dpPath, textMsg, `${inDir}/dp_template.png`).then((dp_template) => {
+    return  new Promise (function(resolve, reject) {
+      return vProccesor.parseMetaData(videoPath).then((metaData) => {
+        console.log(metaData);
+        let handle;
+         if (metaData.isPotrait) {
+           handle = vProccesor.processPotrait(videoPath).save(formatedVideoPath);
+         } else {
+           handle = vProccesor.processLandScape(videoPath).save(formatedVideoPath);
+         }
+
+         handle.on('error', function(err, stdout, stderr) {
+           console.log(`Cannot process: ${stdout} ${err.message} `);
+           reject('phase 1');
+         }).on('end', function(stdout, stderr) {
+           console.log(`Transcoding succeeded !`);
+           resolve(formatedVideoPath);
+         });
+      });
+
+    }).then((formatedVideoPath) => {
+
+      return new new Promise(function(resolve, reject) {
+        vProccesor.overlayImageOverVideo(dp_template, formatedVideoPath)
+          .save(overlayedVideoPath)
+          .on('error', function(err, stdout, stderr) {
+            console.log(`Cannot process: ${stdout} ${err.message} `);
+            reject('phase 2');
+          }).on('end', function(stdout, stderr) {
+            console.log(`Overlayed succeeded !`);
+            resolve();
+          });
+      });
+
+    });
+
+  });
+
+
 }
 
 
