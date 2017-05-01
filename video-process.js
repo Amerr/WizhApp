@@ -4,9 +4,9 @@ var Promise = require('promise');
 
 var vProccesor = {
   APP_VIDEO: {
-    WIDTH: 480,
+    WIDTH: 800,
     ASPECT_RATIO: '1:1',
-    HEIGHT: 720,
+    HEIGHT: 1200,
     DURATION: 5,
     HAPPY_BEAT: './audio/upbeat.mp3'
   },
@@ -98,6 +98,7 @@ var vProccesor = {
     ]).outputOptions([
       '-c:v copy',
       '-c:a aac',
+      '-ac 2',
       '-map 1:v',
       '-map [a5]'
     ]);
@@ -133,72 +134,79 @@ var vProccesor = {
  * Sample code
  * @type {[type]}
  *
+ // NOTE: Overlay image template through the whole video.
  vProccesor.overlayImageOverVideo('./workstation/processed/dp_template.png', './workstation/processed/io2.mp4')
    .save('./workstation/processed/overlayed.mp4').on('error', function(err, stdout, stderr) {
          console.log(`Cannot process: ${stderr} ${err.message} `);
        });
        return;
 
-
+// NOTE: Transform image to Video
 vProccesor.processImageToVideo('./workstation/io.jpg').save('./workstation/processed/image.mp4')
 .on('error', function(err, stdout, stderr) {
       console.log(`Cannot process: ${stderr} ${err.message} `);
     });
 return;
 
+// NOTE: Final touch to the processed video to overlay happy beat audio for the concated video
 vProccesor.overlayBeatAudio('./workstation/processed/processed.mp4').save('./workstation/processed/mix.mp4')
 
-// ffmpeg('./workstation/io.mp4').size(`480x?`).setAspect('2:3').autopad(true).save('./workstation/processed/1.mp4');
-// return
-// ffmpeg('./workstation/io.mp4')
-//   .complexFilter([
-//     'scale=480:-1[scaled]',
-//     '[scaled]setsar=sar=2:3'
-//   ]).save('./workstation/processed/1.mp4').on('error', function(err, stdout, stderr) {
-//         console.log(`Cannot process: ${stderr} ${err.message} `);
-//       });
-// return;
+  ffmpeg('./workstation/io.mp4').size(`480x?`).setAspect('2:3').autopad(true).save('./workstation/processed/1.mp4');
+  return
+  ffmpeg('./workstation/io.mp4')
+    .complexFilter([
+      'scale=480:-1[scaled]',
+      '[scaled]setsar=sar=2:3'
+    ]).save('./workstation/processed/1.mp4').on('error', function(err, stdout, stderr) {
+          console.log(`Cannot process: ${stderr} ${err.message} `);
+        });
+  return;
 
-// vProccesor.setAppWidth('./workstation/processed/io.mp4').save('./workstation/processed/as.mp4');
-// return;
+  vProccesor.setAppWidth('./workstation/processed/io.mp4').save('./workstation/processed/as.mp4');
+  return;
 
-// vProccesor.addNullAudio('./workstation/io.mp4').save('./workstation/processed/io.mp4')
-// vProccesor.concatFiles(['./workstation/processed/as.mp4', './workstation/processed/processed.mp4'], './workstation/processed/combined.mp4')
-//   .on('error', function(err, stdout, stderr) {
-//       console.log(`Cannot process: ${stderr} ${err.message} `);
-//     })
-// .on('end', function(stdout, stderr) {
-//     if (stderr) {
-//       console.log(`Failed ${stderr}`);
-//     } else {
-//       console.log(`Transcoding succeeded !`);
-//     }
-//
-//     });
+  NOTE: ADD null audio source to video generated from image.
+  vProccesor.addNullAudio('./workstation/io.mp4').save('./workstation/processed/io.mp4')
+  vProccesor.concatFiles(['./workstation/processed/as.mp4', './workstation/processed/processed.mp4'], './workstation/processed/combined.mp4')
+    .on('error', function(err, stdout, stderr) {
+        console.log(`Cannot process: ${stderr} ${err.message} `);
+      })
+  .on('end', function(stdout, stderr) {
+      if (stderr) {
+        console.log(`Failed ${stderr}`);
+      } else {
+        console.log(`Transcoding succeeded !`);
+      }
 
-// vProccesor.setAppWidth('./workstation/io3.mp4').save('./workstation/x.mp4')
+      });
+
+vProccesor.setAppWidth('./workstation/io3.mp4').save('./workstation/x.mp4')
+
+
+//NOTE:  Video Transformation from raw to particular Width and Height
+
+  [ 'io.mp4', 'io1.mp4', 'io2.mp4', 'io3.mp4', 'io4.mp4', 'io5.mp4', 'io6.mp4', 'io7.mp4', 'io8.mp4'].map((file) => {
+    var filePath = `./workstation/${file}`;
+    var outputFilePath = `./workstation/processed/${file}`;
+    return vProccesor.parseMetaData(filePath).then((metaData) => {
+      let handle;
+      if (metaData.isPotrait) {
+        handle = vProccesor.processPotrait(filePath).save(outputFilePath);
+      } else {
+        handle = vProccesor.processLandScape(filePath).save(outputFilePath);
+      }
+      handle.on('error', function(err, stdout, stderr) {
+        console.log(`Cannot process ${file}:  ${err.message} `);
+      }).on('end', function(stdout, stderr) {
+        console.log(`Transcoding ${file} succeeded !`);
+      });
+    });
+
+  });
 
 
 
-
-  // [ 'io.mp4', 'io1.mp4', 'io2.mp4', 'io3.mp4', 'io4.mp4', 'io5.mp4', 'io6.mp4', 'io7.mp4', 'io8.mp4'].map((file) => {
-  //   var filePath = `./workstation/${file}`;
-  //   var outputFilePath = `./workstation/processed/${file}`;
-  //   return vProccesor.parseMetaData(filePath).then((metaData) => {
-  //     let handle;
-  //     if (metaData.isPotrait) {
-  //       handle = vProccesor.processPotrait(filePath).save(outputFilePath);
-  //     } else {
-  //       handle = vProccesor.processLandScape(filePath).save(outputFilePath);
-  //     }
-  //     handle.on('error', function(err, stdout, stderr) {
-  //       console.log(`Cannot process ${file}:  ${err.message} `);
-  //     }).on('end', function(stdout, stderr) {
-  //       console.log(`Transcoding ${file} succeeded !`);
-  //     });
-  //   });
-  //
-  // });
+//NOTE:  Video Concatenation for the processed file
 
 var list = ['io.mp4','io1.mp4', 'io2.mp4', 'io3.mp4', 'io4.mp4', 'io5.mp4', 'io6.mp4', 'io7.mp4', 'io8.mp4'].map((file) => {
   return `./workstation/processed/${file}`;

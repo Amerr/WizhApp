@@ -308,7 +308,7 @@ function videoWatermark(uid, wid, video, dpName, textMsg){
   let dpPath = path.join(inDir, dpName);
   let videoPath = path.join(inDir, video);
   let formatedVideoPath = path.join(outDir, video);
-  let overlayedVideoPath = path.join(outDir, 'overlayed.mp4');
+  let overlayedVideoPath = path.join(outDir, `${uid}_overlayed.mp4`);
 
   if (!fs.existsSync(outDir)) {
     fs.ensureDirSync(outDir);
@@ -336,7 +336,7 @@ function videoWatermark(uid, wid, video, dpName, textMsg){
 
     }).then((formatedVideoPath) => {
 
-      return new new Promise(function(resolve, reject) {
+      return new Promise(function(resolve, reject) {
         vProccesor.overlayImageOverVideo(dp_template, formatedVideoPath)
           .save(overlayedVideoPath)
           .on('error', function(err, stdout, stderr) {

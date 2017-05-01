@@ -7,13 +7,13 @@ const IMAGES = {
 };
 
 const APP_VIDEO = {
-  WIDTH: 480,
-  HEIGHT: 720,
-  GEOMETRY: '+50+50',
-  DP_SIZE: '75x75!',
-  TEXT_SIZE: 20,
-  TEXT_X: 150,
-  TEXT_Y: 80
+  WIDTH: 800,
+  HEIGHT: 1200,
+  GEOMETRY: '+75+50',
+  DP_SIZE: '150x150!',
+  TEXT_SIZE: 50,
+  TEXT_X: 250,
+  TEXT_Y: 100
 };
 
 // convert  \( -size 1x400 xc:transparent \) \( -size 1x100 gradient:none-#333 \) -append  -scale 400x400! -quality 100 gradient_transparent.png
@@ -109,7 +109,7 @@ function overlayGradientWithProfile(profileImg, gradientImg) {
 function addTextToGradientTemplate(template, textMsg, outputPath) {
   return new Promise(function(resolve, reject) {
     gm(template)
-    .font('./Spirax-Regular.ttf', APP_VIDEO.TEXT_SIZE)
+    .font('./fonts/OpenSans-Light.ttf', APP_VIDEO.TEXT_SIZE)
     .fill('#FFFFFF')
     .drawText(APP_VIDEO.TEXT_X, APP_VIDEO.TEXT_Y, textMsg, 'SOUTHWEST')
     .sharpen(50)
@@ -118,7 +118,7 @@ function addTextToGradientTemplate(template, textMsg, outputPath) {
       if (!err) {
         resolve(this.outname);
       } else {
-        reject("Failed to add text to template", err);
+        reject(`Failed to add text to template: ${err}`);
       }
     });
   });
@@ -207,7 +207,7 @@ function makeDpTemplate(profileImg, textMsg, outputPath) {
   });
 }
 //
-// main('user1.jpg', 'Nallai allai')
+// main('./workstation/user.png', 'Nallai allai', 'Image2.png')
 // .then(function(userTemplate) {
 //   return overlayImageWithProfile(userTemplate, 'Image.png').then(function(masterOutput) {
 //     console.log("Master output", masterOutput);
